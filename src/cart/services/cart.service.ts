@@ -1,55 +1,48 @@
 import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
-import { v4 } from 'uuid';
+import { CartEntity } from '../entities/cart.entity';
 
-import { Cart } from '../models';
+import { CartStatuses } from '../models';
 
 @Injectable()
 export class CartService {
-  private userCarts: Record<string, Cart> = {};
+  constructor(
+    @InjectRepository(CartEntity)
+    private cartsRepository: Repository<CartEntity>,
+  ) {}
 
-  findByUserId(userId: string): Cart {
-    return this.userCarts[ userId ];
+  async findByUserId(userId: string): Promise<CartEntity> {
+    return this.cartsRepository.findOneBy({ user_id: userId });
   }
 
-  createByUserId(userId: string) {
-    const id = v4();
-    const userCart = {
-      id,
-      items: [],
-    };
-
-    // this.userCarts[ userId ] = userCart;
-
-    return userCart;
+  async createByUserId(userId: string): Promise<CartEntity> {
+    return this.cartsRepository.save({ user_id: userId, status: CartStatuses.OPEN });
   }
 
-  findOrCreateByUserId(userId: string): Cart {
+  async findOrCreateByUserId(userId: string): Promise<CartEntity> {
     const userCart = this.findByUserId(userId);
 
     if (userCart) {
       return userCart;
     }
 
-    // return this.createByUserId(userId);
+    return this.createByUserId(userId);
   }
 
-  updateByUserId(userId: string, { items }: Cart): Cart {
-    const { id, ...rest } = this.findOrCreateByUserId(userId);
+  async updateByUserId(userId: string, { items }: CartEntity): Promise<CartEntity> {
+    const { id, ...rest } = await this.findOrCreateByUserId(userId);
 
-    const updatedCart = {
+    return this.cartsRepository.save({
       id,
       ...rest,
       items: [ ...items ],
-    }
-
-    this.userCarts[ userId ] = { ...updatedCart };
-
-    return { ...updatedCart };
+    });
   }
 
-  removeByUserId(userId): void {
-    this.userCarts[ userId ] = null;
+  async removeByUserId(userId): Promise<void> {
+    await this.cartsRepository.delete({ user_id: userId });
   }
 
 }
